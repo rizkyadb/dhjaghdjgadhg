@@ -29,6 +29,12 @@
   }
 }
 
+/* RainbowKit custom styles */
+.iekbcc0 {
+  --rk-colors-accentColor: #9600ef !important;
+  --rk-colors-accentColorForeground: white !important;
+}
+
 @layer utilities {
 
   /* Utility umum dari project Anda */

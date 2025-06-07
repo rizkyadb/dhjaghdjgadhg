@@ -1,12 +1,12 @@
 // ===========================================================================
-// File: src/context/AuthContext.tsx (PASTIKAN IMPOR INI BENAR)
-// Deskripsi: React Context untuk manajemen state autentikasi dan data pengguna.
+// File: src/context/AuthContext.tsx (MODIFIKASI - Gunakan Wagmi hooks)
+// Deskripsi: React Context untuk manajemen state autentikasi dan data pengguna dengan RainbowKit/Wagmi.
 // ===========================================================================
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import apiClient, { getTwitterOAuthUrl } from '../services/apiService'; // Mengimpor getTwitterOAuthUrl sebagai named import
+import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
+import apiClient, { getTwitterOAuthUrl } from '../services/apiService';
 import { UserPublic } from '../types/user';
 import toast from 'react-hot-toast';
-// import { API_BASE_URL as APP_API_BASE_URL } from '../config'; // Tidak dipakai di sini
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -30,6 +30,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isFetchingProfile, setIsFetchingProfile] = useState<boolean>(false);
+
+  const { address, isConnected } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+  const { disconnect } = useDisconnect();
 
   const fetchUserProfile = async (currentToken?: string) => {
     const tokenToUse = currentToken || token;
@@ -102,24 +106,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Handle wallet disconnection
+  useEffect(() => {
+    if (!isConnected && isAuthenticated) {
+      // Wallet was disconnected, but user is still authenticated
+      // You might want to keep the session or logout automatically
+      console.log("Wallet disconnected but user still authenticated");
+    }
+  }, [isConnected, isAuthenticated]);
 
   const connectWallet = async () => {
-    setIsLoading(true);
-    setIsFetchingProfile(false);
-    if (!(window as any).ethereum) {
-      toast.error("Dompet MetaMask tidak terdeteksi. Silakan install MetaMask.");
-      setIsLoading(false);
+    if (!isConnected || !address) {
+      toast.error("Silakan hubungkan dompet Anda terlebih dahulu menggunakan tombol Connect Wallet.");
       return;
     }
 
+    setIsLoading(true);
+    setIsFetchingProfile(false);
+
     try {
-      const accounts = await (window as any).ethereum.request({ method: 'eth_requestAccounts' });
-      if (!accounts || accounts.length === 0) {
-        toast.error("Gagal mendapatkan alamat dompet.");
-        setIsLoading(false);
-        return;
-      }
-      const walletAddress = accounts[0];
+      const walletAddress = address;
 
       toast.loading("Meminta challenge dari server...", { id: "auth-process" });
       const challengeResponse = await apiClient.get(`/auth/challenge`, { params: { walletAddress } });
@@ -132,9 +138,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       toast.loading("Silakan tandatangani pesan di dompet Anda...", { id: "auth-process" });
-      const signature = await (window as any).ethereum.request({
-        method: 'personal_sign',
-        params: [messageToSign, walletAddress],
+      
+      const signature = await signMessageAsync({
+        message: messageToSign,
       });
 
       if (!signature) {
@@ -201,6 +207,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('cigar_ds_token');
     localStorage.removeItem('cigar_ds_user');
     delete apiClient.defaults.headers.common['Authorization'];
+    
+    // Disconnect wallet as well
+    disconnect();
+    
     toast.success("Anda telah logout.");
     setIsLoading(false);
   };
@@ -214,8 +224,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const toastId = "twitter-connect-initiate";
     toast.loading("Mempersiapkan koneksi ke X...", { id: toastId });
     try {
-      const response = await getTwitterOAuthUrl(); // Menggunakan fungsi yang diimpor
-      const { redirect_url } = response; // Menggunakan redirect_url dari skema
+      const response = await getTwitterOAuthUrl();
+      const { redirect_url } = response;
 
       if (redirect_url) {
         toast.success("Mengarahkan ke halaman otorisasi X...", { id: toastId });
@@ -237,7 +247,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, token, isLoading, isFetchingProfile, connectWallet, logout, fetchUserProfile, initiateTwitterConnect }}>
+    <AuthContext.Provider value={{ 
+      isAuthenticated, 
+      user, 
+      token, 
+      isLoading, 
+      isFetchingProfile, 
+      connectWallet, 
+      logout, 
+      fetchUserProfile, 
+      initiateTwitterConnect 
+    }}>
       {children}
     </AuthContext.Provider>
   );
