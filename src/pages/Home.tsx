@@ -4,11 +4,17 @@ import PortfolioCard from '../components/PortfolioCard';
 import MissionLog from '../components/MissionLog';
 import MissionProgress from '../components/MissionProgress';
 import AllyTracker from '../components/AllyTracker';
+import DailyCheckin from '../components/DailyCheckin';
 
 const Home: React.FC = () => {
   return (
     <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <ProjectStatus />
+      
+      {/* Daily Check-in Section - Only show on larger screens below profile */}
+      <div className="hidden lg:block">
+        <DailyCheckin />
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <PortfolioCard />
@@ -22,6 +28,11 @@ const Home: React.FC = () => {
         <div className="lg:col-span-3">
           <AllyTracker />
         </div>
+      </div>
+
+      {/* Daily Check-in Section - Show on smaller screens */}
+      <div className="lg:hidden">
+        <DailyCheckin />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
